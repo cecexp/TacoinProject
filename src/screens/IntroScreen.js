@@ -118,7 +118,7 @@ export default function IntroScreen({ onFinish }) {
     ]).start(() => setIdx(i => i + 1));
   };
 
-  const IMG_H = height * 0.60;
+  const IMG_H = height;
   const BOX_MAX = Math.min(width, 500);
 
   return (
@@ -155,8 +155,6 @@ export default function IntroScreen({ onFinish }) {
         {
           opacity: boxFade,
           transform: [{ translateY: boxSlide }],
-          width: BOX_MAX,
-          alignSelf: 'center',
         }
       ]}>
         {/* Tira de azulejos (misma que Menu/Splash) */}
@@ -219,17 +217,10 @@ export default function IntroScreen({ onFinish }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#1a0a0a',
-    justifyContent: 'flex-end',
+    backgroundColor: '#000',
   },
 
-  gradient: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    // Negro sólido en la base, invisible arriba
-    backgroundColor: '#1a0a0a',
-    opacity: 0.82,
-  },
+  gradient: { display: 'none' },
 
   sceneCounter: {
     position: 'absolute',
@@ -257,7 +248,9 @@ const styles = StyleSheet.create({
 
   // ── Cuadro ──
   box: {
-    backgroundColor: '#fff',
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(255,252,248,0.93)',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
@@ -265,7 +258,7 @@ const styles = StyleSheet.create({
     borderColor: '#8b1a1a',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.2,
     shadowRadius: 14,
     elevation: 24,
   },

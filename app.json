@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Tacoin Tycoon",
+    "slug": "tacoin-tycoon",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tacoin.tycoon"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.tacoin.tycoon"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

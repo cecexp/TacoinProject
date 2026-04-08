@@ -43,6 +43,64 @@ const bs = StyleSheet.create({
   fill:  { height: '100%', borderRadius: 5 },
 });
 
+// Tarjeta de análisis contrafactual
+function ContrafactualCard({ item }) {
+  const bg = item.tipo === 'fracaso' ? '#fef3f2' : '#f0f9ff';
+  const border = item.tipo === 'fracaso' ? '#fca5a5' : '#bae6fd';
+  const color = item.tipo === 'fracaso' ? '#c0392b' : '#1a6fb5';
+  return (
+    <View style={[cf.card, { backgroundColor: bg, borderColor: border }]}>
+      <View style={cf.header}>
+        <Text style={{ fontSize: 20 }}>{item.emoji}</Text>
+        <Text style={[cf.titulo, { color }]}>{item.titulo}</Text>
+      </View>
+      <Text style={cf.descripcion}>{item.descripcion}</Text>
+      <View style={cf.leccionRow}>
+        <Text style={cf.leccionIcon}>💡</Text>
+        <Text style={cf.leccion}>{item.leccion}</Text>
+      </View>
+    </View>
+  );
+}
+const cf = StyleSheet.create({
+  card:       { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
+  header:     { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
+  titulo:     { flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 },
+  descripcion:{ fontSize: 12, color: '#4a3228', lineHeight: 18, marginBottom: 8 },
+  leccionRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
+  leccionIcon:{ fontSize: 14 },
+  leccion:    { flex: 1, fontSize: 11, color: '#6b5c54', fontStyle: 'italic', lineHeight: 16 },
+});
+
+// Historial de decisiones probabilísticas
+function HistorialDecision({ entrada }) {
+  if (!entrada.resultado) return null;
+  const { exito } = entrada.resultado;
+  const pct = Math.round((entrada.decision.probabilidadExito || 1) * 100);
+  const color = exito ? '#4a9e4a' : '#c0392b';
+  const icon = exito ? '✅' : '❌';
+  return (
+    <View style={hd.row}>
+      <Text style={hd.icon}>{icon}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={hd.titulo}>{entrada.decision.titulo}</Text>
+        <Text style={hd.sub}>{exito ? entrada.resultado.efecto.label : entrada.resultado.efecto.label}</Text>
+      </View>
+      <View style={[hd.badge, { backgroundColor: color + '20', borderColor: color + '60' }]}>
+        <Text style={[hd.badgeText, { color }]}>{pct}%</Text>
+      </View>
+    </View>
+  );
+}
+const hd = StyleSheet.create({
+  row:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: '#e8e0d4' },
+  icon:      { fontSize: 14, width: 20 },
+  titulo:    { fontSize: 12, fontWeight: '700', color: '#3a1a0a' },
+  sub:       { fontSize: 11, color: '#8c7c6e', marginTop: 2 },
+  badge:     { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  badgeText: { fontSize: 11, fontWeight: '800' },
+});
+
 export default function WeeklyReportScreen() {
   const { state, cerrarReporteSemanal } = useGame();
   const { resumenSemana, xpTotal, logrosObtenidos, misionesCumplidas, rachaDias } = state;
@@ -65,9 +123,18 @@ export default function WeeklyReportScreen() {
 
   if (!resumenSemana) return null;
 
-  const { semanaGlobal, totalDecisiones, totalRecomendadas, totalNoRecomendadas, porcentajeRecomendadas, efectivoFinal, ahorroFinal } = resumenSemana;
+  const {
+    semanaGlobal, totalDecisiones, totalRecomendadas, totalNoRecomendadas,
+    porcentajeRecomendadas, efectivoFinal, ahorroFinal, contrafactual, historialSemana,
+  } = resumenSemana;
   const pct = Math.round(porcentajeRecomendadas * 100);
   const maxW = Math.min(width, 520);
+
+  // Stats roguelike de la semana
+  const decisionesConResultado = (historialSemana || []).filter(h => h.resultado);
+  const exitosRoguelike = decisionesConResultado.filter(h => h.resultado.exito).length;
+  const totalRoguelike  = decisionesConResultado.length;
+  const pctRoguelike    = totalRoguelike > 0 ? Math.round((exitosRoguelike / totalRoguelike) * 100) : 0;
 
   const getMedalla = () => {
     if (pct >= 80) return { emoji: '🥇', label: '¡Empresario estrella!', color: '#b5820a', frase: '"Treinta años de contador no me dieron esto. Tú lo lograste en una semana."' };
@@ -76,7 +143,6 @@ export default function WeeklyReportScreen() {
     return              { emoji: '📉',  label: 'Hay que mejorar',          color: '#c0392b', frase: '"No te desanimes. Hasta el mejor taquero quemó la birria alguna vez."' };
   };
   const medalla = getMedalla();
-
   const patrimonioTotal = (efectivoFinal || 0) + (ahorroFinal || 0) + (state.carteraCrypto * state.precioBC);
 
   return (
@@ -98,7 +164,6 @@ export default function WeeklyReportScreen() {
             <Text style={styles.heroSemana}>Semana {semanaGlobal} completada</Text>
             <Text style={[styles.heroLabel, { color: medalla.color }]}>{medalla.label}</Text>
             <Text style={styles.heroPct}>{pct}% de decisiones acertadas</Text>
-            {/* Don José comenta */}
             <View style={styles.donJoseQuote}>
               <Text style={styles.donJoseIcon}>👨‍🍳</Text>
               <Text style={styles.donJoseFrase}>{medalla.frase}</Text>
@@ -106,36 +171,100 @@ export default function WeeklyReportScreen() {
           </View>
         </Animated.View>
 
-        {/* Stats Cards */}
         <Animated.View style={{ opacity: cardsFade, transform: [{ translateY: cardsAnim }] }}>
 
-          {/* Decisiones */}
+          {/* Stats de decisiones */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>📊 Decisiones de la semana</Text>
-            <BarraProgreso pct={pct}       color="#4a9e4a" label="✅ Aciertos"  valor={`${totalRecomendadas} de ${totalDecisiones}`} />
-            <BarraProgreso pct={100 - pct} color="#c0392b" label="❌ Errores"   valor={`${totalNoRecomendadas} de ${totalDecisiones}`} />
+            <BarraProgreso pct={pct}       color="#4a9e4a" label="✅ Acertadas"  valor={`${totalRecomendadas} de ${totalDecisiones}`} />
+            <BarraProgreso pct={100 - pct} color="#c0392b" label="❌ Errores"    valor={`${totalNoRecomendadas} de ${totalDecisiones}`} />
+            {/* Nuevo: suerte roguelike */}
+            {totalRoguelike > 0 && (
+              <>
+                <View style={styles.separador} />
+                <Text style={styles.subCardTitle}>🎲 Resultados probabilísticos</Text>
+                <BarraProgreso
+                  pct={pctRoguelike}
+                  color="#b5820a"
+                  label="🎲 Decisiones exitosas"
+                  valor={`${exitosRoguelike}/${totalRoguelike}`}
+                />
+                <Text style={styles.ayudaTexto}>
+                  {pctRoguelike >= 60
+                    ? 'El azar estuvo de tu lado esta semana 🍀'
+                    : pctRoguelike >= 40
+                    ? 'Semana pareja — mezcla de suerte y desgracia'
+                    : 'El mercado fue difícil. Las probabilidades no estuvieron a tu favor 🎰'}
+                </Text>
+              </>
+            )}
           </View>
 
           {/* Finanzas */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>💰 Estado financiero</Text>
             <View style={styles.finRow}>
-              <FinBox icon="💵" label="Efectivo"       value={`$${(efectivoFinal || 0).toFixed(0)}`}  color="#4a9e4a" />
-              <FinBox icon="🏦" label="Ahorro"          value={`$${(ahorroFinal  || 0).toFixed(0)}`}  color="#1a6fb5" />
-              <FinBox icon="💎" label="Patrimonio"      value={`$${patrimonioTotal.toFixed(0)}`}        color="#8b1a1a" />
+              <FinBox icon="💵" label="Efectivo"  value={`$${(efectivoFinal || 0).toFixed(0)}`}   color="#4a9e4a" />
+              <FinBox icon="🏦" label="Ahorro"    value={`$${(ahorroFinal  || 0).toFixed(0)}`}   color="#1a6fb5" />
+              <FinBox icon="💎" label="Patrimonio" value={`$${patrimonioTotal.toFixed(0)}`}         color="#8b1a1a" />
             </View>
+            {state.carteraCrypto > 0 && (
+              <View style={styles.cryptoRow}>
+                <Text style={styles.cryptoIcon}>🪙</Text>
+                <Text style={styles.cryptoText}>
+                  {state.carteraCrypto.toFixed(2)} BC × ${state.precioBC.toFixed(2)} = ${(state.carteraCrypto * state.precioBC).toFixed(0)}
+                </Text>
+              </View>
+            )}
           </View>
+
+          {/* ── ANÁLISIS CONTRAFACTUAL — lo nuevo ──────────────── */}
+          {contrafactual && (contrafactual.contrafactuales?.length > 0 || contrafactual.consejoPróximaSemana) && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>🔮 ¿Qué hubiera pasado si...?</Text>
+              <Text style={styles.contrafactualIntro}>
+                Análisis de tus decisiones de esta semana y lo que podría haber sido diferente.
+              </Text>
+
+              {contrafactual.contrafactuales?.map((item, i) => (
+                <ContrafactualCard key={i} item={item} />
+              ))}
+
+              {/* Consejo para la siguiente semana */}
+              <View style={styles.consejoPróximo}>
+                <Text style={styles.consejoPróximoIcon}>🧭</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.consejoPróximoTitulo}>Consejo para la semana {semanaGlobal + 1}</Text>
+                  <Text style={styles.consejoPróximoTexto}>{contrafactual.consejoPróximaSemana}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Historial de decisiones de la semana */}
+          {historialSemana && historialSemana.length > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>📋 Historial de decisiones</Text>
+              {historialSemana.filter(h => h.resultado).map((entrada, i) => (
+                <HistorialDecision key={i} entrada={entrada} />
+              ))}
+              {historialSemana.filter(h => !h.resultado).length > 0 && (
+                <Text style={styles.ayudaTexto}>
+                  Algunas decisiones fueron garantizadas (sin probabilidad).
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Progresión */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>⬆️ Tu progresión</Text>
             <View style={styles.progRow}>
-              <ProgBox emoji={nivel.emoji}  label="Nivel"          value={nivel.titulo}            color={nivel.color} />
-              <ProgBox emoji="🎯"           label="Misiones"        value={`${misionesCumplidas} cumplidas`} color="#b5820a" />
-              <ProgBox emoji="🔥"           label="Racha"           value={`${rachaDias} días`}     color="#c0392b" />
-              <ProgBox emoji="🏅"           label="Logros"          value={`${logrosObtenidos.length} / 7`} color="#4a9e4a" />
+              <ProgBox emoji={nivel.emoji}  label="Nivel"    value={nivel.titulo}                color={nivel.color} />
+              <ProgBox emoji="🎯"           label="Misiones" value={`${misionesCumplidas} cumplidas`} color="#b5820a" />
+              <ProgBox emoji="🔥"           label="Racha"    value={`${rachaDias} días`}         color="#c0392b" />
+              <ProgBox emoji="🏅"           label="Logros"   value={`${logrosObtenidos.length} / 8`} color="#4a9e4a" />
             </View>
-            {/* XP bar */}
             <View style={styles.xpRow}>
               <Text style={styles.xpLabel}>{nivel.emoji} {nivel.xpEnNivel} / {nivel.xpParaSiguiente} XP</Text>
               {nivel.siguiente && <Text style={styles.xpNext}>→ {nivel.siguiente.emoji} {nivel.siguiente.titulo}</Text>}
@@ -193,10 +322,8 @@ const pb = StyleSheet.create({
 const styles = StyleSheet.create({
   content: { padding: 16, paddingTop: 52 },
   hero: {
-    backgroundColor: '#fff',
-    borderRadius: 20, overflow: 'hidden',
-    borderWidth: 2, borderColor: '#8b1a1a',
-    marginBottom: 14,
+    backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden',
+    borderWidth: 2, borderColor: '#8b1a1a', marginBottom: 14,
     shadowColor: '#8b1a1a', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15, shadowRadius: 12, elevation: 8,
   },
@@ -214,14 +341,29 @@ const styles = StyleSheet.create({
     borderRadius: 16, borderWidth: 1, borderColor: '#e8e0d4',
     padding: 16, marginBottom: 12,
   },
-  cardTitle: { fontSize: 14, fontWeight: '800', color: '#3a1a0a', marginBottom: 14 },
-  finRow:    { flexDirection: 'row', gap: 8 },
-  progRow:   { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  xpRow:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  xpLabel:   { fontSize: 11, color: '#6b5c54', fontWeight: '700' },
-  xpNext:    { fontSize: 11, color: '#8c7c6e' },
-  xpTrack:   { height: 8, backgroundColor: '#e8e0d4', borderRadius: 4, overflow: 'hidden' },
-  xpFill:    { height: '100%', borderRadius: 4 },
+  cardTitle:    { fontSize: 14, fontWeight: '800', color: '#3a1a0a', marginBottom: 14 },
+  subCardTitle: { fontSize: 12, fontWeight: '700', color: '#6b5c54', marginBottom: 10 },
+  separador:    { height: 1, backgroundColor: '#e8e0d4', marginVertical: 12 },
+  ayudaTexto:   { fontSize: 11, color: '#8c7c6e', fontStyle: 'italic', marginTop: 4 },
+  finRow:       { flexDirection: 'row', gap: 8 },
+  cryptoRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTopWidth: 0.5, borderTopColor: '#e8e0d4' },
+  cryptoIcon:   { fontSize: 16 },
+  cryptoText:   { fontSize: 12, color: '#8b1a1a', fontWeight: '700' },
+  contrafactualIntro: { fontSize: 12, color: '#6b5c54', marginBottom: 12, lineHeight: 18 },
+  consejoPróximo: {
+    flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+    backgroundColor: '#f0fdf4', borderRadius: 10, borderWidth: 1, borderColor: '#bbf7d0',
+    padding: 12, marginTop: 4,
+  },
+  consejoPróximoIcon:   { fontSize: 20 },
+  consejoPróximoTitulo: { fontSize: 12, fontWeight: '800', color: '#166534', marginBottom: 4 },
+  consejoPróximoTexto:  { fontSize: 12, color: '#15803d', lineHeight: 17 },
+  progRow:  { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  xpRow:    { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  xpLabel:  { fontSize: 11, color: '#6b5c54', fontWeight: '700' },
+  xpNext:   { fontSize: 11, color: '#8c7c6e' },
+  xpTrack:  { height: 8, backgroundColor: '#e8e0d4', borderRadius: 4, overflow: 'hidden' },
+  xpFill:   { height: '100%', borderRadius: 4 },
   btnOuter:  { position: 'relative', marginTop: 4 },
   btnShadow: { position: 'absolute', bottom: -4, left: 4, right: 4, height: '100%', backgroundColor: '#4a0c0c', borderRadius: 50 },
   btnFace:   { backgroundColor: '#8b1a1a', borderRadius: 50, paddingVertical: 16, alignItems: 'center', borderWidth: 2.5, borderColor: '#6b1212' },

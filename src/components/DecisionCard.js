@@ -2,74 +2,77 @@ import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useGame } from '../context/GameContext';
 
+// Barra de probabilidad con color semáforo
+function BarraProbabilidad({ pct }) {
+  const color = pct >= 70 ? '#4a9e4a' : pct >= 50 ? '#d4901a' : '#c0392b';
+  const label = pct >= 70 ? 'Alta' : pct >= 50 ? 'Media' : 'Baja';
+  return (
+    <View style={bp.wrap}>
+      <View style={bp.row}>
+        <Text style={[bp.pct, { color }]}>{pct}% de éxito</Text>
+        <Text style={[bp.label, { color }]}>{label}</Text>
+      </View>
+      <View style={bp.track}>
+        <View style={[bp.fill, { width: `${pct}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+const bp = StyleSheet.create({
+  wrap:  { marginTop: 6 },
+  row:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  pct:   { fontSize: 11, fontWeight: '800' },
+  label: { fontSize: 10, fontWeight: '700' },
+  track: { height: 5, backgroundColor: '#e8e0d4', borderRadius: 3, overflow: 'hidden' },
+  fill:  { height: '100%', borderRadius: 3 },
+});
+
 export default function DecisionCard({ decision, onPress, disabled }) {
   const { state } = useGame();
   const { efectivoNegocio, ahorroPersonal, carteraCrypto, precioBC } = state;
-
-  // ── Calcular si el usuario PUEDE ejecutar esta decisión ─────
-  // Usa efectivo + ahorro como capital total disponible
   const capitalTotal = efectivoNegocio + ahorroPersonal;
+  const pct = Math.round((decision.probabilidadExito || 1) * 100);
 
   const puedeEjecutar = (() => {
-    if (decision.esCryptoCompra) {
-      return efectivoNegocio >= (decision.montoCryptoCompra || 0) ||
-             capitalTotal    >= (decision.montoCryptoCompra || 0);
-    }
-    if (decision.esCryptoCompraDesdeAhorro) {
-      return ahorroPersonal >= (decision.montoCryptoCompra || 0);
-    }
-    if (decision.esCryptoVenta) {
-      return carteraCrypto >= (decision.cantidadVenta || 0);
-    }
-    // Decisión normal con costo
-    const costo = Math.abs(Math.min(0, decision.deltaEfectivo || 0));
-    if (costo === 0) return true; // sin costo, siempre disponible
-    // Puede pagar con efectivo O con efectivo+ahorro
+    if (decision.esCryptoCompra) return capitalTotal >= (decision.montoCryptoCompra || 0);
+    if (decision.esCryptoCompraDesdeAhorro) return ahorroPersonal >= (decision.montoCryptoCompra || 0);
+    if (decision.esCryptoVenta) return carteraCrypto >= (decision.cantidadVenta || 0);
+    const costo = Math.abs(Math.min(0, decision.deltaEfectivo || 0)) || (decision.costoEjecutar || 0);
+    if (costo === 0) return true;
     return capitalTotal >= costo;
   })();
 
   const bloqueadoPorFondos = !puedeEjecutar;
   const estaDisabled = disabled || bloqueadoPorFondos;
 
-  // ── Colores según tipo ───────────────────────────────────────
   const getColor = () => {
     if (bloqueadoPorFondos) return '#b8b0a4';
-    if (decision.esCryptoCompra || decision.esCryptoVenta || decision.esCryptoCompraDesdeAhorro) return '#8b1a1a';
-    const delta = (decision.deltaEfectivo || 0) + (decision.deltaAhorro || 0);
+    if (decision.categoria === 'crypto') return '#8b1a1a';
+    const delta = (decision.efectoExito?.deltaEfectivo || decision.deltaEfectivo || 0);
     if (delta > 0) return '#4a9e4a';
     if (delta < 0) return '#c0392b';
     return '#8c7c6e';
   };
 
-  const getImpacto = () => {
-    if (decision.esCryptoCompra)
-      return { label: `Inviertes $${decision.montoCryptoCompra}`, sub: 'a cambio de BirriaCoin', icon: '🪙' };
-    if (decision.esCryptoVenta)
-      return { label: `Vendes ${decision.cantidadVenta} BC`, sub: 'recibes pesos', icon: '💵' };
-    if (decision.esCryptoCompraDesdeAhorro)
-      return { label: `Del ahorro: $${decision.montoCryptoCompra}`, sub: 'a BirriaCoin', icon: '🪙' };
-    const parts = [];
-    if (decision.deltaEfectivo) parts.push(`Efectivo ${decision.deltaEfectivo > 0 ? '+' : ''}$${decision.deltaEfectivo}`);
-    if (decision.deltaAhorro)   parts.push(`Ahorro ${decision.deltaAhorro > 0 ? '+' : ''}$${decision.deltaAhorro}`);
-    if (decision.deltaCrypto)   parts.push(`BC ${decision.deltaCrypto > 0 ? '+' : ''}${decision.deltaCrypto}`);
-    return parts.length
-      ? { label: parts.join('  ·  '), sub: 'impacto en tus finanzas', icon: parts[0].includes('+') ? '📈' : '📉' }
-      : { label: 'Sin cambio financiero', sub: 'no afecta tus números', icon: '➖' };
-  };
-
   const getTipo = () => {
     if (bloqueadoPorFondos) return { txt: 'ACCIÓN', bg: '#8c7c6e' };
-    if (decision.esCryptoCompra || decision.esCryptoVenta || decision.esCryptoCompraDesdeAhorro)
-      return { txt: 'CRYPTO', bg: '#8b1a1a' };
-    const delta = (decision.deltaEfectivo || 0) + (decision.deltaAhorro || 0);
-    if (delta > 0) return { txt: 'INGRESO', bg: '#4a9e4a' };
-    if (delta < 0) return { txt: 'GASTO',   bg: '#c0392b' };
-    return { txt: 'ACCIÓN', bg: '#8c7c6e' };
+    if (decision.categoria === 'crypto') return { txt: 'CRYPTO', bg: '#8b1a1a' };
+    if (decision.categoria === 'ahorro') return { txt: 'AHORRO', bg: '#1a6fb5' };
+    return { txt: 'NEGOCIO', bg: '#4a9e4a' };
+  };
+
+  // Mostrar impacto de éxito vs fracaso
+  const getImpactos = () => {
+    const exito = decision.efectoExito;
+    const fracaso = decision.efectoFracaso;
+    if (!exito) return null;
+    return { exitoLabel: exito.label || 'Resultado positivo', fracasoLabel: fracaso?.label || 'Sin efecto' };
   };
 
   const color  = getColor();
-  const impacto = getImpacto();
   const tipo   = getTipo();
+  const impactos = getImpactos();
+  const esCryptoCard = decision.categoria === 'crypto';
 
   return (
     <TouchableOpacity
@@ -84,8 +87,16 @@ export default function DecisionCard({ decision, onPress, disabled }) {
       activeOpacity={0.78}
     >
       {/* Badge tipo */}
-      <View style={[styles.tipoBadge, { backgroundColor: tipo.bg }]}>
-        <Text style={styles.tipoText}>{tipo.txt}</Text>
+      <View style={styles.headerRow}>
+        <View style={[styles.tipoBadge, { backgroundColor: tipo.bg }]}>
+          <Text style={styles.tipoText}>{tipo.txt}</Text>
+        </View>
+        {/* Badge cripto especial */}
+        {esCryptoCard && !bloqueadoPorFondos && (
+          <View style={styles.cryptoBadge}>
+            <Text style={styles.cryptoBadgeText}>🪙 BirriaCoin</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.row}>
@@ -97,8 +108,32 @@ export default function DecisionCard({ decision, onPress, disabled }) {
             {decision.descripcion}
           </Text>
 
-          {/* Impacto o mensaje de fondos insuficientes */}
-          {bloqueadoPorFondos ? (
+          {/* Barra de probabilidad ROGUELIKE */}
+          {!bloqueadoPorFondos && decision.probabilidadExito < 1.0 && (
+            <BarraProbabilidad pct={pct} />
+          )}
+          {!bloqueadoPorFondos && decision.probabilidadExito >= 1.0 && (
+            <View style={styles.garantizadoBadge}>
+              <Text style={styles.garantizadoText}>✅ Resultado garantizado</Text>
+            </View>
+          )}
+
+          {/* Efectos éxito / fracaso */}
+          {!bloqueadoPorFondos && impactos && decision.probabilidadExito < 1.0 && (
+            <View style={styles.efectosRow}>
+              <View style={[styles.efectoBox, { borderColor: '#4a9e4a30', backgroundColor: '#4a9e4a08' }]}>
+                <Text style={styles.efectoIcon}>✅</Text>
+                <Text style={[styles.efectoLabel, { color: '#4a9e4a' }]}>{impactos.exitoLabel}</Text>
+              </View>
+              <View style={[styles.efectoBox, { borderColor: '#c0392b30', backgroundColor: '#c0392b08' }]}>
+                <Text style={styles.efectoIcon}>❌</Text>
+                <Text style={[styles.efectoLabel, { color: '#c0392b' }]}>{impactos.fracasoLabel}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Fondos insuficientes */}
+          {bloqueadoPorFondos && (
             <View style={styles.fondosRow}>
               <Text style={styles.fondosIcon}>💡</Text>
               <View style={{ flex: 1 }}>
@@ -108,18 +143,9 @@ export default function DecisionCard({ decision, onPress, disabled }) {
                 </Text>
               </View>
             </View>
-          ) : (
-            <View style={[styles.impactoRow, { backgroundColor: color + '12', borderColor: color + '40' }]}>
-              <Text style={styles.impactoIcon}>{impacto.icon}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.impactoLabel, { color }]}>{impacto.label}</Text>
-                <Text style={styles.impactoSub}>{impacto.sub}</Text>
-              </View>
-            </View>
           )}
         </View>
 
-        {/* Flecha o candado */}
         <View style={[
           styles.arrow,
           bloqueadoPorFondos
@@ -146,20 +172,26 @@ const styles = StyleSheet.create({
   disabledGlobal: { opacity: 0.4 },
   disabledFondos: { opacity: 0.75, backgroundColor: 'rgba(245,242,235,0.9)' },
 
-  tipoBadge: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, marginBottom: 8 },
-  tipoText:  { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+  headerRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  tipoBadge:   { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  tipoText:    { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+  cryptoBadge: { backgroundColor: '#8b1a1a12', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: '#8b1a1a30' },
+  cryptoBadgeText: { color: '#8b1a1a', fontSize: 10, fontWeight: '700' },
 
-  row:         { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  content:     { flex: 1, gap: 6 },
-  titulo:      { color: '#3a1a0a', fontSize: 15, fontWeight: '800' },
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  content: { flex: 1, gap: 4 },
+  titulo:  { color: '#3a1a0a', fontSize: 15, fontWeight: '800' },
   descripcion: { color: '#6b5c54', fontSize: 13, lineHeight: 18 },
 
-  impactoRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginTop: 2 },
-  impactoIcon: { fontSize: 16 },
-  impactoLabel:{ fontSize: 12, fontWeight: '700' },
-  impactoSub:  { fontSize: 10, color: '#8c7c6e', marginTop: 1 },
+  garantizadoBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  garantizadoText:  { fontSize: 11, color: '#4a9e4a', fontWeight: '700' },
 
-  fondosRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#e8c4b844', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginTop: 2, backgroundColor: '#fdf8f0' },
+  efectosRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  efectoBox:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  efectoIcon: { fontSize: 12 },
+  efectoLabel:{ fontSize: 10, fontWeight: '600', flex: 1 },
+
+  fondosRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#e8c4b844', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginTop: 4, backgroundColor: '#fdf8f0' },
   fondosIcon:  { fontSize: 14 },
   fondosLabel: { fontSize: 11, fontWeight: '700', color: '#b5820a' },
   fondosSub:   { fontSize: 10, color: '#8c7c6e', marginTop: 1 },

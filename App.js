@@ -1,8 +1,7 @@
 import { registerRootComponent } from 'expo';
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { GameProvider } from './src/context/GameContext';
-import { useGame } from './src/context/GameContext';
+import { GameProvider, useGame } from './src/context/GameContext';
 import GameScreen from './src/screens/GameScreen';
 import WeeklyReportScreen from './src/screens/WeeklyReportScreen';
 import BankruptScreen from './src/screens/BankruptScreen';
@@ -10,63 +9,92 @@ import SplashScreen from './src/screens/SplashScreen';
 import MenuScreen from './src/screens/MenuScreen';
 import MapScreen from './src/screens/MapScreen';
 import IntroScreen from './src/screens/IntroScreen';
+import LevelIntroScreen from './src/screens/LevelIntroScreen';
+import GlosarioScreen from './src/screens/GlosarioScreen';
 
-function AppNavigator() {
+// ── Dentro del GameProvider: accede al state del juego ──────
+function GameFlow({ appScreen, setAppScreen }) {
   const { state } = useGame();
-  if (state.screen === 'weekly_report') return <WeeklyReportScreen />;
-  if (state.screen === 'bankrupt') return <BankruptScreen />;
-  return <GameScreen />;
-}
+  const [showGlosario, setShowGlosario] = useState(false);
 
-function App() {
-  // Flujo: splash → menu → intro (solo 1a vez) → map → game
-  const [screen, setScreen] = useState('splash');
-  const [introVista, setIntroVista] = useState(false);
-  const [semanaActual] = useState(1);
+  // Cuando termina la semana y vuelve al juego, sincronizamos pantalla
+  const semanaActual = state.semanaGlobal;
 
-  if (screen === 'splash') {
+  if (showGlosario) {
     return (
       <>
         <StatusBar style="dark" />
-        <SplashScreen onFinish={() => setScreen('menu')} />
-      </>
-    );
-  }
-
-  if (screen === 'menu') {
-    return (
-      <>
-        <StatusBar style="dark" />
-        <MenuScreen onPlay={() => setScreen(introVista ? 'map' : 'intro')} />
-      </>
-    );
-  }
-
-  if (screen === 'intro') {
-    return (
-      <>
-        <StatusBar hidden />
-        <IntroScreen onFinish={() => { setIntroVista(true); setScreen('map'); }} />
-      </>
-    );
-  }
-
-  if (screen === 'map') {
-    return (
-      <>
-        <StatusBar style="dark" />
-        <MapScreen
-          semanaActual={semanaActual}
-          onPlay={() => setScreen('game')}
+        <GlosarioScreen
+          glosarioDesbloqueado={state.glosarioDesbloqueado || []}
+          onCerrar={() => setShowGlosario(false)}
         />
       </>
     );
   }
 
+  if (appScreen === 'map') {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <MapScreen
+          semanaActual={semanaActual}
+          onPlay={() => setAppScreen('level_intro')}
+        />
+      </>
+    );
+  }
+
+  if (appScreen === 'level_intro') {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <LevelIntroScreen
+          semana={semanaActual}
+          dia={state.diaGlobal}
+          onFinish={() => setAppScreen('game')}
+        />
+      </>
+    );
+  }
+
+  // Pantallas del juego en sí
+  if (state.screen === 'weekly_report') {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <WeeklyReportScreen onContinuar={() => setAppScreen('map')} />
+      </>
+    );
+  }
+  if (state.screen === 'bankrupt') return <><StatusBar style="dark" /><BankruptScreen /></>;
+
+  return (
+    <>
+      <StatusBar style="dark" />
+      <GameScreen onVerGlosario={() => setShowGlosario(true)} onVolverMapa={() => setAppScreen('map')} />
+    </>
+  );
+}
+
+// ── App raíz ─────────────────────────────────────────────────
+function App() {
+  const [screen, setScreen]         = useState('splash');
+  const [introVista, setIntroVista] = useState(false);
+  const [appScreen, setAppScreen]   = useState('map'); // dentro del GameProvider
+
+  if (screen === 'splash')
+    return <><StatusBar style="dark" /><SplashScreen onFinish={() => setScreen('menu')} /></>;
+
+  if (screen === 'menu')
+    return <><StatusBar style="dark" /><MenuScreen onPlay={() => setScreen(introVista ? 'game_flow' : 'intro')} /></>;
+
+  if (screen === 'intro')
+    return <><StatusBar hidden /><IntroScreen onFinish={() => { setIntroVista(true); setScreen('game_flow'); }} /></>;
+
+  // Todo lo demás vive dentro del GameProvider
   return (
     <GameProvider>
-      <StatusBar style="light" />
-      <AppNavigator />
+      <GameFlow appScreen={appScreen} setAppScreen={setAppScreen} />
     </GameProvider>
   );
 }
