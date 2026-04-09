@@ -6,12 +6,20 @@ import { getNivelActual } from '../data/gameData';
 export default function HUD() {
   const { state } = useGame();
   const { efectivoNegocio, ahorroPersonal, carteraCrypto, precioBC,
-          diaGlobal, semanaGlobal, accionesRestantes, xpTotal } = state;
+          diaGlobal, semanaGlobal, accionesRestantes, xpTotal, historialPrecios } = state;
   const { width } = useWindowDimensions();
   const valorCrypto  = carteraCrypto * precioBC;
   const TOTAL        = 3;
   const nivel        = getNivelActual(xpTotal || 0);
   const barPct       = Math.round(nivel.progreso * 100);
+
+  // Tendencia BC
+  const hist = historialPrecios || [precioBC];
+  const n = hist.length;
+  const bcCambio = n >= 2 ? ((hist[n-1] - hist[0]) / hist[0]) * 100 : 0;
+  const bcTendIcon  = bcCambio > 3 ? '📈' : bcCambio < -3 ? '📉' : '➡️';
+  const bcTendLabel = bcCambio > 0 ? `+${bcCambio.toFixed(1)}%` : `${bcCambio.toFixed(1)}%`;
+  const bcTendColor = bcCambio > 3 ? '#4a9e4a' : bcCambio < -3 ? '#c0392b' : '#d4901a';
 
   return (
     <View style={styles.container}>
@@ -67,14 +75,15 @@ export default function HUD() {
           <FinanceCard icon="💵" label="Efectivo"  value={`$${efectivoNegocio.toFixed(0)}`}  color="#4a9e4a" help="Dinero para operar" />
           <FinanceCard icon="🏦" label="Ahorro"    value={`$${ahorroPersonal.toFixed(0)}`}   color="#1a6fb5" help="Emergencias" />
           <FinanceCard icon="🪙" label="BC"         value={`${carteraCrypto.toFixed(2)}`}     color="#b5820a" sub={`≈$${valorCrypto.toFixed(0)}`} help="BirriaCoin" />
-          <FinanceCard icon="📈" label="Precio BC" value={`$${precioBC.toFixed(2)}`}          color="#8b1a1a" help="Por moneda" />
+          <FinanceCard icon="📈" label="Precio BC" value={`$${precioBC.toFixed(2)}`}          color="#8b1a1a"
+            help={`${bcTendIcon} ${bcTendLabel}`} helpColor={bcTendColor} />
         </View>
       </View>
     </View>
   );
 }
 
-function FinanceCard({ icon, label, value, sub, color, help }) {
+function FinanceCard({ icon, label, value, sub, color, help, helpColor }) {
   return (
     <View style={[styles.card, { borderTopColor: color }]}>
       <View style={styles.cardTopRow}>
@@ -83,7 +92,7 @@ function FinanceCard({ icon, label, value, sub, color, help }) {
       </View>
       {sub && <Text style={[styles.cardSub, { color }]}>{sub}</Text>}
       <Text style={styles.cardLabel}>{label}</Text>
-      <Text style={styles.cardHelp}>{help}</Text>
+      <Text style={[styles.cardHelp, helpColor ? { color: helpColor, fontWeight: '700' } : {}]}>{help}</Text>
     </View>
   );
 }

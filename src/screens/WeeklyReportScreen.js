@@ -136,6 +136,13 @@ export default function WeeklyReportScreen() {
   const totalRoguelike  = decisionesConResultado.length;
   const pctRoguelike    = totalRoguelike > 0 ? Math.round((exitosRoguelike / totalRoguelike) * 100) : 0;
 
+  // CHECK DE SUPERVIVENCIA
+  const CAPITAL_MIN = 50;
+  const decConRes = (historialSemana || []).filter(h => h.resultado);
+  const exitosPct = decConRes.length > 0 ? decConRes.filter(h => h.resultado.exito).length / decConRes.length : 1;
+  const capitalOk = (efectivoFinal || 0) >= CAPITAL_MIN;
+  const scoreOk   = exitosPct >= 0.50;
+
   const getMedalla = () => {
     if (pct >= 80) return { emoji: '🥇', label: '¡Empresario estrella!', color: '#b5820a', frase: '"Treinta años de contador no me dieron esto. Tú lo lograste en una semana."' };
     if (pct >= 60) return { emoji: '🥈', label: 'Buen emprendedor',       color: '#6b7280', frase: '"Vas bien, mijo. Mi abuela diría que tienes instinto de taquero."' };
@@ -274,6 +281,32 @@ export default function WeeklyReportScreen() {
             </View>
           </View>
 
+          {/* CHECK DE SUPERVIVENCIA */}
+          <View style={[styles.card, !capitalOk || !scoreOk ? { borderColor: '#fca5a5', borderWidth: 2 } : {}]}>
+            <Text style={styles.cardTitle}>🛡️ Check de Supervivencia</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={[sv.chip, { borderColor: capitalOk ? '#bbf7d0' : '#fca5a5', backgroundColor: capitalOk ? '#f0fdf4' : '#fef2f2' }]}>
+                <Text style={{ fontSize: 14 }}>{capitalOk ? '✅' : '❌'}</Text>
+                <View>
+                  <Text style={sv.chipLabel}>Capital mín. $50</Text>
+                  <Text style={[sv.chipVal, { color: capitalOk ? '#15803d' : '#991b1b' }]}>${(efectivoFinal || 0).toFixed(0)}</Text>
+                </View>
+              </View>
+              <View style={[sv.chip, { borderColor: scoreOk ? '#bbf7d0' : '#fca5a5', backgroundColor: scoreOk ? '#f0fdf4' : '#fef2f2', flex: 1 }]}>
+                <Text style={{ fontSize: 14 }}>{scoreOk ? '✅' : '❌'}</Text>
+                <View>
+                  <Text style={sv.chipLabel}>Score ≥50% éxito</Text>
+                  <Text style={[sv.chipVal, { color: scoreOk ? '#15803d' : '#991b1b' }]}>{Math.round(exitosPct * 100)}%</Text>
+                </View>
+              </View>
+            </View>
+            {(!capitalOk || !scoreOk) && (
+              <View style={sv.alerta}>
+                <Text style={sv.alertaTxt}>⚠️ Don José está en quiebra al avanzar. ¡Mejora ambos criterios!</Text>
+              </View>
+            )}
+          </View>
+
           {/* Botón */}
           <TouchableOpacity style={styles.btnOuter} onPress={cerrarReporteSemanal} activeOpacity={0.85}>
             <View style={styles.btnShadow} />
@@ -317,6 +350,14 @@ const pb = StyleSheet.create({
   box:   { flex: 1, alignItems: 'center', gap: 3 },
   val:   { fontSize: 12, fontWeight: '800', textAlign: 'center' },
   label: { fontSize: 9, color: '#8c7c6e', textAlign: 'center' },
+});
+
+const sv = StyleSheet.create({
+  chip:      { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 10 },
+  chipLabel: { fontSize: 10, color: '#6b5c54', fontWeight: '700' },
+  chipVal:   { fontSize: 15, fontWeight: '800' },
+  alerta:    { marginTop: 10, backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#fca5a5' },
+  alertaTxt: { fontSize: 12, color: '#991b1b', fontWeight: '600', lineHeight: 18 },
 });
 
 const styles = StyleSheet.create({
